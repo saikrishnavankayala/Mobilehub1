@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: 'https://mobilehub-backend-td7b.onrender.com',
+  baseURL: 'https://mobilehub-backend-td7b.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
