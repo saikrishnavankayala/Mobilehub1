@@ -1,7 +1,7 @@
-import os
 import secrets
 import logging
 from datetime import datetime, timedelta
+from flask import current_app
 from app.extensions import db
 from app.models.otp import OTP
 
@@ -36,10 +36,10 @@ class ProductionOTPProvider(OTPProvider):
         return True
 
 def get_otp_provider() -> OTPProvider:
-    provider_type = os.getenv("OTP_PROVIDER", "mock").lower()
+    provider_type = current_app.config.get("OTP_PROVIDER", "mock").lower()
     if provider_type == "production":
-        api_key = os.getenv("OTP_API_KEY", "")
-        sender_id = os.getenv("OTP_SENDER_ID", "MOBHUB")
+        api_key = current_app.config.get("OTP_API_KEY", "")
+        sender_id = current_app.config.get("OTP_SENDER_ID", "MOBHUB")
         return ProductionOTPProvider(api_key, sender_id)
     return MockOTPProvider()
 
@@ -50,11 +50,13 @@ class OTPService:
         return f"{secrets.randbelow(900000) + 100000}"
 
     @classmethod
-    def send_verification_otp(cls, mobile: str, expiry_seconds: int = 120, cooldown_seconds: int = 60):
+    def send_verification_otp(cls, mobile: str, expiry_seconds: int = None, cooldown_seconds: int = None):
         """
         Create or update OTP record and send OTP to mobile.
         Returns: (success: bool, message: str, dev_otp: str | None)
         """
+        expiry_seconds = expiry_seconds or current_app.config["OTP_EXPIRY_SECONDS"]
+        cooldown_seconds = cooldown_seconds or current_app.config["OTP_RESEND_COOLDOWN_SECONDS"]
         now = datetime.utcnow()
 
         # Check existing active OTP for cooldown
@@ -86,17 +88,18 @@ class OTPService:
         if not sent:
             return False, "Failed to deliver SMS. Please try again.", None
 
-        is_dev = os.getenv("FLASK_ENV", "development") == "development" or os.getenv("OTP_PROVIDER") == "mock"
+        is_dev = current_app.config.get("DEBUG", False) or current_app.config["OTP_PROVIDER"] == "mock"
         dev_otp = otp_plain if is_dev else None
 
         return True, "OTP sent successfully to your mobile number.", dev_otp
 
     @classmethod
-    def verify_otp(cls, mobile: str, entered_otp: str, max_attempts: int = 3):
+    def verify_otp(cls, mobile: str, entered_otp: str, max_attempts: int = None):
         """
         Verify submitted OTP against stored hash.
         Returns: (success: bool, message: str)
         """
+        max_attempts = max_attempts or current_app.config["OTP_MAX_ATTEMPTS"]
         now = datetime.utcnow()
         otp_record = OTP.query.filter_by(mobile=mobile, verified=False).order_by(OTP.created_at.desc()).first()
 

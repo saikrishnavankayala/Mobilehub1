@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+const apiBaseUrl = import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD
+    ? 'https://mobilehub-backend-td7b.onrender.com/api'
+    : '/api');
+
 export const api = axios.create({
-  baseURL: 'https://mobilehub-backend-td7b.onrender.com/api',
+  baseURL: apiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },

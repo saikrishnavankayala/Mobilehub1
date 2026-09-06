@@ -6,6 +6,24 @@ load_dotenv()
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
+
+def _database_uri() -> str:
+    """Return the configured database URL, with a SQLite default for local use."""
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        instance_folder = os.path.join(BASE_DIR, "instance")
+        os.makedirs(instance_folder, exist_ok=True)
+        db_file_path = os.path.join(instance_folder, "mobile_hub.db").replace(os.sep, "/")
+        return f"sqlite:///{db_file_path}"
+
+    # Render may provide either scheme. SQLAlchemy's PostgreSQL dialect needs
+    # the latter (and uses psycopg2-binary from requirements.txt by default).
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if database_url.startswith("postgresql://"):
+        return database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return database_url
+
 class Config:
     """Base Configuration"""
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-mobile-hub-secret-key-2026")
@@ -15,17 +33,8 @@ class Config:
     JWT_HEADER_NAME = "Authorization"
     JWT_HEADER_TYPE = "Bearer"
 
-    # Database: Always resolve SQLite path to absolute instance/mobile_hub.db
-    raw_db_url = os.getenv("DATABASE_URL")
-    if not raw_db_url or "sqlite:///" in raw_db_url:
-        instance_folder = os.path.join(BASE_DIR, "instance")
-        os.makedirs(instance_folder, exist_ok=True)
-        db_file_path = os.path.join(instance_folder, "mobile_hub.db").replace(os.sep, "/")
-        SQLALCHEMY_DATABASE_URI = f"sqlite:///{db_file_path}"
-    else:
-        if raw_db_url.startswith("postgres://"):
-            raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
-        SQLALCHEMY_DATABASE_URI = raw_db_url
+    # Defaults to the existing local SQLite file; production receives DATABASE_URL.
+    SQLALCHEMY_DATABASE_URI = _database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # CORS

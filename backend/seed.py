@@ -10,22 +10,29 @@ app = create_app(os.getenv("FLASK_ENV", "development"))
 
 def seed():
     with app.app_context():
-        print("Creating database tables if not exist...")
-        db.create_all()
+        # Schema changes are owned by Flask-Migrate. Run `flask db upgrade`
+        # before this script in every environment.
 
         # 1. Seed Admin
-        admin_email = "admin@mobilehub.com"
+        admin_email = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@mobilehub.com")
+        admin_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
         admin = Admin.query.filter_by(email=admin_email).first()
         if not admin:
-            print("Creating default Admin user...")
+            if not admin_password:
+                if os.getenv("FLASK_ENV") == "production":
+                    raise RuntimeError(
+                        "DEFAULT_ADMIN_PASSWORD must be configured before creating the first production admin."
+                    )
+                # Preserve the existing local-development seed behavior.
+                admin_password = "Admin@123"
             admin = Admin(
-                name="Mobile Hub Super Admin",
+                name=os.getenv("DEFAULT_ADMIN_NAME", "Mobile Hub Super Admin"),
                 email=admin_email,
                 created_at=datetime.utcnow()
             )
-            admin.set_password("Admin@123")
+            admin.set_password(admin_password)
             db.session.add(admin)
-            print(f"-> Admin created: Email: {admin_email} | Password: Admin@123")
+            print("-> Initial admin created.")
         else:
             print("Default admin already exists.")
 
@@ -139,9 +146,6 @@ def seed():
 
         print("\n==========================================")
         print("SEEDING COMPLETE!")
-        print("Admin Portal Credentials:")
-        print("  Email:    admin@mobilehub.com")
-        print("  Password: Admin@123")
         print("==========================================")
 
 if __name__ == "__main__":

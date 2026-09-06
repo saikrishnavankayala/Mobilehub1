@@ -1,4 +1,5 @@
 from datetime import datetime
+from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models.customer import Customer
 from app.models.spin import Spin
@@ -60,8 +61,17 @@ class CustomerService:
             created_at=datetime.utcnow()
         )
         db.session.add(new_customer)
-        db.session.commit()
-        return True, "Customer registered successfully.", new_customer
+        try:
+            db.session.commit()
+            return True, "Customer registered successfully.", new_customer
+        except IntegrityError:
+            # PostgreSQL enforces the unique mobile index if two registrations
+            # race. Return the single persisted customer instead of a 500.
+            db.session.rollback()
+            customer = Customer.query.filter_by(mobile=clean_mobile).first()
+            if customer:
+                return True, "Customer record found. Proceed to verification.", customer
+            raise
 
     @staticmethod
     def get_by_mobile(mobile: str) -> Customer:
@@ -80,4 +90,3 @@ class CustomerService:
         customer.social_verified = verified
         db.session.commit()
         return True, "Social media participation confirmed."
-

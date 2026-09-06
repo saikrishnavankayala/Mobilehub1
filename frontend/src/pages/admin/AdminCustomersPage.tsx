@@ -45,8 +45,18 @@ export const AdminCustomersPage: React.FC = () => {
     fetchCustomers(1, search, otpFilter);
   };
 
-  const handleExport = () => {
-    window.open('/api/admin/export/customers', '_blank');
+  const handleExport = async () => {
+    try {
+      const response = await api.get('/admin/export/customers', { responseType: 'blob' });
+      const downloadUrl = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = 'mobile_hub_campaign_report.xlsx';
+      link.click();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Failed to export customers:', err);
+    }
   };
 
   return (

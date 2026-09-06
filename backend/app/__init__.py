@@ -11,6 +11,17 @@ def create_app(config_name=None):
     app = Flask(__name__)
     app.config.from_object(config_by_name.get(config_name, config_by_name["default"]))
 
+    if config_name == "production":
+        missing_secrets = [
+            key for key in ("SECRET_KEY", "JWT_SECRET_KEY")
+            if not os.getenv(key)
+        ]
+        if missing_secrets:
+            raise RuntimeError(
+                "Production requires these environment variables: "
+                + ", ".join(missing_secrets)
+            )
+
     # Initialize Extensions
     db.init_app(app)
     migrate.init_app(app, db)
@@ -46,6 +57,13 @@ def create_app(config_name=None):
     app.register_blueprint(claim_bp)
     app.register_blueprint(export_bp)
     app.register_blueprint(social_bp)
+
+    # Keep the original plural routes used by the UI and support the documented
+    # singular public API paths without duplicating route logic.
+    app.register_blueprint(customer_bp, url_prefix="/api/customer", name="customer_compat")
+    app.register_blueprint(prize_bp, url_prefix="/api/prize", name="prize_compat")
+    app.register_blueprint(claim_bp, url_prefix="/api/claim", name="claim_compat")
+    app.register_blueprint(social_bp, url_prefix="/api/social", name="social_compat")
 
     # JWT Error Callbacks
     @jwt.expired_token_loader
